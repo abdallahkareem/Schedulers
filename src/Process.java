@@ -6,8 +6,9 @@ public class Process {
 	public int priority;
 	public int quantum;
 	
-	public int startTime;
-	public int finishTime;
+	public int remaining;
+	public int waiting;
+	public int turnaround;
 	
 	public Process(String name, int arrival, int burst, int priority, int quantum) {
 		super();
