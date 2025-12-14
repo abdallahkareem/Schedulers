@@ -21,12 +21,13 @@ public class AGScheduler implements Scheduler { // Hybrid Algorithm (FCFS, Prior
 				}
 			}
 
-			// if ready queue is empty then we finished processes
+			// no processes has arrived
 			if (ready_queue.isEmpty()) {
 				time++;
 				continue;
 			}
 			Process current = ready_queue.poll();
+			System.out.println(current.name);
 			int current_quantum = current.quantum;
 			
 			// for the first 25% of the quantum we will serve as FCFS
@@ -51,8 +52,8 @@ public class AGScheduler implements Scheduler { // Hybrid Algorithm (FCFS, Prior
 				}
 			}
 			if (higher_priority_process != current) {
-				double remain_priority_quantum = (current_quantum - (second_quarter_quantum + quarter_quantum))/2;
-				current.quantum = current_quantum + (int) Math.ceil(remain_priority_quantum/2);
+				int remain_priority_quantum = current_quantum -  quarter_quantum;
+				current.quantum += (int) Math.ceil(remain_priority_quantum/2);
 				ready_queue.add(current);
 				continue;
 			}
@@ -76,14 +77,13 @@ public class AGScheduler implements Scheduler { // Hybrid Algorithm (FCFS, Prior
 					}
 				}
 				if (shortest_job_process != current) {
-					current.quantum = current_quantum + remainingQuantum;
+					current.quantum += remainingQuantum;
 					ready_queue.add(current);
 					break;
 				}
-				for (int i = 0; i < remainingQuantum && current.remaining > 0; i++) {
-					current.remaining--;
-					time++;
-				}
+				current.remaining--;
+				time++;
+				remainingQuantum--;
 				if (current.remaining == 0) {
 					completed++;
 					current.quantum = 0;
