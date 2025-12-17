@@ -1,6 +1,6 @@
 # CPU Schedulers Simulator
 
-## 📌 Overview
+## Overview
 
 This project is a **Java-based CPU Scheduling Simulator** developed as part of **Operating System I – Assignment #3**.
 
@@ -56,7 +56,7 @@ For each process, execution follows these steps:
 
 ---
 
-### 🧪 AG Scheduling Scenarios
+### AG Scheduling Scenarios
 
 After execution, one of the following cases occurs:
 
@@ -81,7 +81,7 @@ After execution, one of the following cases occurs:
 
 ---
 
-## 📥 Input Format
+## Input Format
 
 Each process is defined by:
 
@@ -95,7 +95,7 @@ Each process is defined by:
 
 ---
 
-## 📊 Example Input
+## Example Input
 
 | Process | Burst Time | Arrival Time | Priority | Quantum |
 | ------- | ---------- | ------------ | -------- | ------- |
@@ -106,7 +106,7 @@ Each process is defined by:
 
 ---
 
-## 📈 Output
+## Output
 
 The simulator displays:
 
@@ -119,13 +119,6 @@ The simulator displays:
 
 ---
 
-## 🛠️ Technologies Used
-
-* **Java**
-* Object-Oriented Programming (OOP)
-* Data Structures (Queue, Priority Queue)
-
----
 
 ## ▶️ How to Run
 
@@ -135,26 +128,5 @@ java Main
 ```
 
 > Make sure all `.java` files are in the same directory.
-
----
-
-## 📚 Course Information
-
-* **Course:** Operating System I
-* **Assignment:** #3 – CPU Scheduling Algorithms
-
----
-
-## ✍️ Author
-
-* **Name:** Abdallah Kareem
-* **Field:** Computer Science & Artificial Intelligence
-
----
-
-## ⭐ Notes
-
-* This project is for **educational purposes**
-* Feel free to fork, improve, or test with different inputs
 
 ---
