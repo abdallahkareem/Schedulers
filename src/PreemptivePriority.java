@@ -3,7 +3,7 @@ import java.util.List;
 public class PreemptivePriority implements Scheduler {
 
 	@Override
-	public void run(List<Process> processes) {
+	public void run(List<Process> processes,int contextSwitch) {
 		System.out.println("====== Preemptive Priority ======");
 		int time = 0;
 		

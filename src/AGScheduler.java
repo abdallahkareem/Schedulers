@@ -3,7 +3,7 @@ import java.util.List;
 import java.util.Queue;
 public class AGScheduler implements Scheduler { // Hybrid Algorithm (FCFS, Priority_P, SRTF)
 	@Override
-	public void run(List<Process> processes) {
+	public void run(List<Process> processes,int contextSwitch) {
 		int completed = 0;
 		int time = 0;
 		int n = processes.size();
