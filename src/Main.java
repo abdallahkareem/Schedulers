@@ -3,18 +3,28 @@ import java.util.List;
 
 public class Main {
 
-	public static void main(String[] args) {
-		List<Process> processes = new ArrayList<>();
-		Process process1 = new Process("p1", 0, 53, 1, 7);
-		Process process2 = new Process("p2", 0, 17, 1, 9);
-		Process process3 = new Process("p3", 0, 68, 1, 4);
-		Process process4 = new Process("p4", 0, 24, 1, 4);
-		processes.add(process1);
-		processes.add(process2);
-		processes.add(process3);
-		processes.add(process4);
-		RoundRobin scheduler = new RoundRobin();
-		scheduler.run(processes ,0);
-		SchedulerPrinter.print(scheduler.getExecutionOrder(), processes);
-	}
+    public static void main(String[] args) {
+
+        List<Process> processes = new ArrayList<>();
+
+        Process process1 = new Process("p1", 2, 6, 3, 0);
+        Process process2 = new Process("p2", 5, 2, 1, 0);
+        Process process3 = new Process("p3", 1, 8, 4, 0);
+        Process process4 = new Process("p4", 0, 3, 5, 0);
+        Process process5 = new Process("p5", 4, 4, 2, 0);
+
+        processes.add(process1);
+        processes.add(process2);
+        processes.add(process3);
+        processes.add(process4);
+        processes.add(process5);
+
+        PreemptivePriority scheduler = new PreemptivePriority();
+        scheduler.run(processes, 0);
+
+        SchedulerPrinter.print(
+                scheduler.getExecutionOrder(),
+                processes
+        );
+    }
 }
