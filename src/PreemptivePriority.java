@@ -1,37 +1,71 @@
+import java.util.LinkedList;
 import java.util.List;
 
 public class PreemptivePriority implements Scheduler {
 
-	@Override
-	public void run(List<Process> processes,int contextSwitch) {
-		System.out.println("====== Preemptive Priority ======");
-		int time = 0;
-		
-		int completed = 0; // Number of completed processes
-		
-		int n = processes.size();
-		for(Process p : processes) {
-			p.remaining = p.burst; // intialize all remainings as bursts 
-		}
-		
-		while(completed < n) {
-			Process current = null;
-			for(int i = 0;i < n;i++) {
-				Process p = processes.get(i);
-				if(p.arrival <= time && p.remaining > 0) {
-					if(current == null) {
-						current = p;
-					}
-					else {
-						if(p.priority < current.priority) {
-							current = p;
-						}
-					}
-				}
-			}
-			
-		}
-		
-	}
+    private List<Process> executionOrder = new LinkedList<>();
 
+    public List<Process> getExecutionOrder() {
+        return executionOrder;
+    }
+
+    @Override
+    public void run(List<Process> processes, int contextSwitch) {
+
+        int n = processes.size();
+        int timer = 0;
+        int finished = 0;
+
+        // initialize remaining burst
+        for (Process p : processes) {
+            p.remaining = p.burst;
+        }
+
+        List<Process> readyList = new LinkedList<>();
+        Process prevProcess = null;
+
+        while (finished < n) {
+
+            // add arrived processes
+            for (Process p : processes) {
+                if (p.arrival <= timer && p.remaining > 0 && !readyList.contains(p)) {
+                    readyList.add(p);
+                }
+            }
+
+            // select highest priority process
+            Process current = null;
+            for (Process p : readyList) {
+                if (current == null || p.priority < current.priority) {
+                    current = p;
+                }
+            }
+
+            // CPU idle
+            if (current == null) {
+                timer++;
+                prevProcess = null;
+                continue;
+            }
+
+            // context switch
+            if (prevProcess != null && prevProcess != current) {
+                timer += contextSwitch;
+            }
+
+            // execute for 1 unit (preemptive)
+            executionOrder.add(current);
+            current.remaining--;
+            timer++;
+            prevProcess = current;
+
+            // finished
+            if (current.remaining == 0) {
+                finished++;
+                current.turnaround = timer - current.arrival;
+                current.waiting = current.turnaround - current.burst;
+                readyList.remove(current);
+            }
+        }
+    }
 }
