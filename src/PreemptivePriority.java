@@ -3,26 +3,31 @@ import java.util.List;
 
 public class PreemptivePriority implements Scheduler {
 
+    protected List<ProcessResult> processResults = new LinkedList<>();
     private List<Process> executionOrder = new LinkedList<>();
 
     public List<Process> getExecutionOrder() {
         return executionOrder;
     }
 
+    public List<ProcessResult> getProcessResults() {
+        return processResults;
+    }
+
     public double getAverageWaitingTime() {
         double totalWaitingTime = 0;
-        for (Process proc : executionOrder) {
-            totalWaitingTime += proc.waiting;
+        for (ProcessResult proc : processResults) {
+            totalWaitingTime += proc.waitingTime;
         }
-        return executionOrder.isEmpty() ? 0 : totalWaitingTime / executionOrder.size();
+        return processResults.isEmpty() ? 0 : totalWaitingTime / processResults.size();
     }
 
     public double getAverageTurnaroundTime() {
         double totalTurnaroundTime = 0;
-        for (Process proc : executionOrder) {
-            totalTurnaroundTime += proc.turnaround;
+        for (ProcessResult proc : processResults) {
+            totalTurnaroundTime += proc.turnaroundTime;
         }
-        return executionOrder.isEmpty() ? 0 : totalTurnaroundTime / executionOrder.size();
+        return processResults.isEmpty() ? 0 : totalTurnaroundTime / processResults.size();
     }
 
     @Override
@@ -80,6 +85,7 @@ public class PreemptivePriority implements Scheduler {
                 finished++;
                 current.turnaround = timer - current.arrival;
                 current.waiting = current.turnaround - current.burst;
+                processResults.add(new ProcessResult(current.name, current.waiting, current.turnaround, new LinkedList<>()));
                 readyList.remove(current);
             }
         }

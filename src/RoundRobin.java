@@ -1,8 +1,14 @@
+import java.util.ArrayList;
 import java.util.LinkedList;
 import java.util.List;
 
 public class RoundRobin implements Scheduler {
 
+    protected List<ProcessResult> processResults = new ArrayList<>();
+    public List<ProcessResult> getProcessResults() {
+        return processResults;
+    }
+    
     private List<Process> executionOrder = new LinkedList<>();
     private int timeQuantum;
 
@@ -62,6 +68,7 @@ public class RoundRobin implements Scheduler {
                 finish++;
                 current.turnaround = timer - current.arrival;
                 current.waiting = current.turnaround - current.burst;
+                processResults.add(new ProcessResult(current.name, current.waiting, current.turnaround, new ArrayList<>()));
             } else {
                 readyList.add(current);
             }
@@ -70,17 +77,17 @@ public class RoundRobin implements Scheduler {
 
     public double getAverageWaitingTime() {
         double totalWaitingTime = 0;
-        for (Process proc : executionOrder) {
-            totalWaitingTime += proc.waiting;
+        for (ProcessResult proc : processResults) {
+            totalWaitingTime += proc.waitingTime;
         }
-        return totalWaitingTime / executionOrder.size();
+        return totalWaitingTime / processResults.size();
     }
 
     public double getAverageTurnaroundTime() {
         double totalTurnaroundTime = 0;
-        for (Process proc : executionOrder) {
-            totalTurnaroundTime += proc.turnaround;
+        for (ProcessResult proc : processResults) {
+            totalTurnaroundTime += proc.turnaroundTime;
         }
-        return totalTurnaroundTime / executionOrder.size();
+        return totalTurnaroundTime / processResults.size();
     }
 }

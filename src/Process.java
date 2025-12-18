@@ -1,3 +1,5 @@
+import java.util.ArrayList;
+import java.util.List;
 
 public class Process {
 	public String name;
@@ -5,7 +7,7 @@ public class Process {
 	public int burst;
 	public int priority;
 	public Integer quantum;
-	
+	List<Integer> quantumHistory = new ArrayList<>();
 	public int remaining;
 	public int waiting;
 	public int turnaround;
@@ -18,6 +20,5 @@ public class Process {
 		this.priority = priority;
 		this.quantum = quantum;
 	}
-	
-	
+
 }

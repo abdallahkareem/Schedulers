@@ -1,15 +1,18 @@
+import java.security.PublicKey;
 import java.util.LinkedList;
 import java.util.List;
 
 public class SRTF implements Scheduler {
-
+    protected List<ProcessResult> processResults = new LinkedList<>();
     private List<Process> executionOrder = new LinkedList<>();
 
     public List<Process> getExecutionOrder() {
         return executionOrder;
     }
 
-
+    public List<ProcessResult> getProcessResults() {
+        return processResults;
+    }
 
     @Override
     public void run(List<Process> processes, int contextSwitch) {
@@ -76,6 +79,7 @@ public class SRTF implements Scheduler {
                 finish++;
                 current.turnaround = timer - current.arrival;
                 current.waiting = current.turnaround - current.burst;
+                processResults.add(new ProcessResult(current.name, current.waiting, current.turnaround, new LinkedList<>()));
                 readyList.remove(current);
             }
         }
@@ -85,19 +89,19 @@ public class SRTF implements Scheduler {
 
     public double getAverageWaitingTime() {
         int totalWaitingTime = 0;
-        for (Process p : executionOrder) {
-            totalWaitingTime += p.waiting;
+        for (ProcessResult proc : processResults) {
+            totalWaitingTime += proc.waitingTime;
         }
-        return (double) totalWaitingTime / executionOrder.size();
+        return (double) totalWaitingTime / processResults.size();
     }
 
 
 
     public double getAverageTurnaroundTime() {
         int totalTurnaroundTime = 0;
-        for (Process p : executionOrder) {
-            totalTurnaroundTime += p.turnaround;
+        for (ProcessResult proc : processResults) {
+            totalTurnaroundTime += proc.turnaroundTime;
         }
-        return (double) totalTurnaroundTime / executionOrder.size();
+        return (double) totalTurnaroundTime / processResults.size();
     }
 }

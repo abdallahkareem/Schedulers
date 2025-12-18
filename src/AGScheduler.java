@@ -1,126 +1,178 @@
-import java.util.LinkedList;
-import java.util.List;
-import java.util.Queue;
-public class AGScheduler implements Scheduler { // Hybrid Algorithm (FCFS, Priority_P, SRTF)
-	private List<Process> executionOrder = new LinkedList<>();
-	
-	public List<Process> getExecutionOrder(){
-		return executionOrder;
-	}
+import java.util.*;
 
-	public double getAverageWaitingTime() {
-        double totalWaitingTime = 0;
-        for (Process proc : executionOrder) {
-            totalWaitingTime += proc.waiting;
-        }
-        return totalWaitingTime / executionOrder.size();
+public class AGScheduler implements Scheduler {
+
+    private List<Process> executionOrder = new LinkedList<>();
+    private List<ProcessResult> processResults = new ArrayList<>();
+
+    public List<Process> getExecutionOrder() {
+        return executionOrder;
+    }
+
+    public List<ProcessResult> getProcessResults() {
+        return processResults;
+    }
+
+    public double getAverageWaitingTime() {
+        double sum = 0;
+        for (ProcessResult r : processResults)
+            sum += r.waitingTime;
+        return processResults.isEmpty() ? 0 : sum / processResults.size();
     }
 
     public double getAverageTurnaroundTime() {
-        double totalTurnaroundTime = 0;
-        for (Process proc : executionOrder) {
-            totalTurnaroundTime += proc.turnaround;
-        }
-        return totalTurnaroundTime / executionOrder.size();
+        double sum = 0;
+        for (ProcessResult r : processResults)
+            sum += r.turnaroundTime;
+        return processResults.isEmpty() ? 0 : sum / processResults.size();
     }
 
-	
-	@Override
-	public void run(List<Process> processes,int contextSwitch) {
-		int completed = 0;
-		int time = 0;
-		int n = processes.size();
+    // ======================= CORE =======================
 
-		// initilize the remaining time to be equal the burst time
-		for (Process process : processes) {
-			process.remaining = process.burst;
-		}
+    @Override
+    public void run(List<Process> processes, int contextSwitch) {
 
-		Queue<Process> ready_queue = new LinkedList<>();
-		while (completed < n) {
-			for (Process p : processes) {
-				if (p.remaining != 0 && p.arrival <= time && !ready_queue.contains(p)) {
-					ready_queue.add(p);
-				}
-			}
+        int time = 0;
+        int completed = 0;
+        int n = processes.size();
 
-			// no processes has arrived
-			if (ready_queue.isEmpty()) {
-				time++;
-				continue;
-			}
-			Process current = ready_queue.poll();
-			System.out.println(current.name);
-			int current_quantum = current.quantum;
-			
-			// for the first 25% of the quantum we will serve as FCFS
-			int quarter_quantum = (int) Math.ceil(current_quantum*0.25);
-			for (int i = 0; i < quarter_quantum && current.remaining > 0; i++) {
-				current.remaining--;
-				time++;
-			}
-			if (current.remaining == 0) {
-				completed++;
-				executionOrder.add(current);
-				current.quantum = 0;
-				continue;
-			}
+        for (Process p : processes)
+            p.remaining = p.burst;
 
-			// for the second 25% = (50% - 25%) we will work as preemtive priority
-			int second_quarter_quantum = (int) Math.ceil(current_quantum*0.5) - quarter_quantum;
-			Process higher_priority_process = current;
-			// find the highr priority process
-			for (Process process : ready_queue) {
-				if (process.priority < higher_priority_process.priority) {
-					higher_priority_process = process;
-				}
-			}
-			if (higher_priority_process != current) {
-				int remain_priority_quantum = current_quantum -  quarter_quantum;
-				current.quantum += (int) Math.ceil(remain_priority_quantum/2);
-				ready_queue.add(current);
-				continue;
-			}
-			for (int i = 0; i < second_quarter_quantum && current.remaining > 0; i++) {
-				current.remaining--;
-				time++;
-			}
-			if (current.remaining == 0) {
-				executionOrder.add(current);
-				completed++;
-				current.quantum = 0;
-				continue;
-			}
+        Queue<Process> ready = new LinkedList<>();
+        while (completed < n) {
 
-			// for the rest quantum time we will work as SJF
-			int remainingQuantum = current_quantum - (quarter_quantum + second_quarter_quantum);
-			while (remainingQuantum > 0) {
-				Process shortest_job_process = current;
-				for (Process process : ready_queue) {
-					if (process.remaining < shortest_job_process.remaining) {
-						shortest_job_process = process;
-					}
-				}
-				if (shortest_job_process != current) {
-					current.quantum += remainingQuantum;
-					ready_queue.add(current);
-					break;
-				}
-				current.remaining--;
-				time++;
-				remainingQuantum--;
-				if (current.remaining == 0) {
-					completed++;
-					executionOrder.add(current);
-					current.quantum = 0;
-					break;
-				}
-			}
-			// if the process finished it's quantum and did't finish it's processes then add 2 to the quantum
-			if (current.remaining > 0 && !ready_queue.contains(current)) {
-				current.quantum += 2;
-				ready_queue.add(current);
-			}
-		}
-	}
+            // add arrived processes
+            for (Process p : processes) {
+                if (p.arrival <= time && p.remaining > 0 && !ready.contains(p)) {
+                    ready.add(p);
+                }
+            }
+
+            if (ready.isEmpty()) {
+                time++;
+                continue;
+            }
+
+            Process current = ready.poll();
+            recordExecution(current);
+
+            int q = current.quantum;
+
+            // ---------- 25% FCFS ----------
+            int q1 = ceil(q * 0.25);
+            time = execute(current, q1, time);
+            if (finishIfDone(current, time)) {
+                completed++;
+                continue;
+            }
+
+            // ---------- 50% Priority ----------
+            Process best = highestPriority(current, ready);
+            if (best != current) {
+                increaseQuantum(current, q - q1);
+                ready.add(current);
+                continue;
+            }
+
+            int q2 = ceil(q * 0.5) - q1;
+            time = execute(current, q2, time);
+            if (finishIfDone(current, time)) {
+                completed++;
+                continue;
+            }
+
+            // ---------- Remaining SJF ----------
+            int remainingQ = q - (q1 + q2);
+            while (remainingQ > 0) {
+
+                Process shortest = shortestJob(current, ready);
+                if (shortest != current) {
+                    increaseQuantum(current, remainingQ);
+                    ready.add(current);
+                    break;
+                }
+
+                time = execute(current, 1, time);
+                remainingQ--;
+
+                if (finishIfDone(current, time)) {
+                    completed++;
+                    break;
+                }
+            }
+
+            if (current.remaining > 0 && !ready.contains(current)) {
+                increaseQuantum(current, 2);
+                ready.add(current);
+            }
+        }
+    }
+
+    // ======================= HELPERS =======================
+
+    private int execute(Process p, int units, int time) {
+        for (int i = 0; i < units && p.remaining > 0; i++) {
+            p.remaining--;
+            time++;
+        }
+        recordExecution(p);
+        return time;
+    }
+
+    private boolean finishIfDone(Process p, int time) {
+        if (p.remaining == 0) {
+            p.quantumHistory.add(0);
+
+            int turnaround = time - p.arrival;
+            int waiting = turnaround - p.burst;
+
+            processResults.add(
+                new ProcessResult(
+                    p.name,
+                    waiting,
+                    turnaround,
+                    new ArrayList<>(p.quantumHistory)
+                )
+            );
+
+            p.quantum = 0;
+            return true;
+        }
+        return false;
+    }
+
+    private void increaseQuantum(Process p, int inc) {
+        p.quantum += ceil(inc / 2.0);
+        p.quantumHistory.add(p.quantum);
+    }
+
+    private void recordExecution(Process p) {
+        if (executionOrder.isEmpty() ||
+            executionOrder.get(executionOrder.size() - 1) != p) {
+            executionOrder.add(p);
+        }
+    }
+
+    private Process highestPriority(Process current, Queue<Process> q) {
+        Process best = current;
+        for (Process p : q) {
+            if (p.priority < best.priority)
+                best = p;
+        }
+        return best;
+    }
+
+    private Process shortestJob(Process current, Queue<Process> q) {
+        Process best = current;
+        for (Process p : q) {
+            if (p.remaining < best.remaining)
+                best = p;
+        }
+        return best;
+    }
+
+    private int ceil(double x) {
+        return (int) Math.ceil(x);
+    }
 }
