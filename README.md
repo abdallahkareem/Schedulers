@@ -1,4 +1,4 @@
-# CPU Schedulers Simulator
+# CPU Schedulers
 
 ## Overview
 
