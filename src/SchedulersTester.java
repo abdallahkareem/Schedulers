@@ -1,12 +1,12 @@
 import java.util.List;
 
 public class SchedulersTester implements Tester<SchedularTestCase> {
-    private SRTF sjf = new SRTF();
-    private RoundRobin rr = new RoundRobin();
-    private PreemptivePriority priority = new PreemptivePriority();
+    
     @Override
     public void test(SchedularTestCase testCase) {
-        
+        SRTF sjf = new SRTF();
+        RoundRobin rr = new RoundRobin(testCase.rrQuantum);
+        PreemptivePriority priority = new PreemptivePriority();
         sjf.run(testCase.processes, testCase.contextSwitch);
         rr.run(testCase.processes, testCase.contextSwitch);
         priority.run(testCase.processes, testCase.contextSwitch);

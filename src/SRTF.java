@@ -2,81 +2,102 @@ import java.util.LinkedList;
 import java.util.List;
 
 public class SRTF implements Scheduler {
-	private List<Process> executionOrder = new LinkedList<>();
-	public List<Process> getExecutionOrder() {
+
+    private List<Process> executionOrder = new LinkedList<>();
+
+    public List<Process> getExecutionOrder() {
         return executionOrder;
     }
 
-    public double getAverageWaitingTime() {
-        double totalWaitingTime = 0;
-        for (Process proc : executionOrder) {
-            totalWaitingTime += proc.waiting;
-        }
-        return totalWaitingTime / executionOrder.size();
-    }
-    
-    public double getAverageTurnaroundTime() {
-        double totalTurnaroundTime = 0;
-        for (Process proc : executionOrder) {
-            totalTurnaroundTime += proc.turnaround;
-        }
-        return totalTurnaroundTime / executionOrder.size();
-    }
-    
+
+
     @Override
     public void run(List<Process> processes, int contextSwitch) {
-		
 
-        int NumProcess = processes.size();
+        int numProcess = processes.size();
         int timer = 0;
         int finish = 0;
 
-        for (Process proc : processes) {
-            proc.remaining = proc.burst;
+        // initialize remaining time
+        for (Process p : processes) {
+            p.remaining = p.burst;
         }
 
-        List<Process> ReadyList = new LinkedList<>();
-        Process prev_Process = null;
+        List<Process> readyList = new LinkedList<>();
+        Process prevProcess = null;
 
-        while (NumProcess > finish) {
+        while (finish < numProcess) {
 
-            for (Process proc : processes) {
-                if (proc.remaining != 0 && proc.arrival <= timer && !ReadyList.contains(proc)) {
-                    ReadyList.add(proc);
+            // add arrived processes to ready list
+            for (Process p : processes) {
+                if (p.remaining > 0 &&
+                    p.arrival <= timer &&
+                    !readyList.contains(p)) {
+                    readyList.add(p);
                 }
             }
 
-            int min = Integer.MAX_VALUE;
+            // select process with shortest remaining time
             Process current = null;
+            int min = Integer.MAX_VALUE;
 
-            for (Process proc : ReadyList) {
-                if (proc.remaining > 0 && proc.remaining < min) {
-                    min = proc.remaining;
-                    current = proc;
+            for (Process p : readyList) {
+                if (p.remaining < min) {
+                    min = p.remaining;
+                    current = p;
                 }
             }
 
+            // CPU idle
             if (current == null) {
                 timer++;
-                prev_Process = null;
+                prevProcess = null;
                 continue;
             }
 
-            if (prev_Process != null && prev_Process != current) {
+            // context switch
+            if (prevProcess != null && prevProcess != current) {
                 timer += contextSwitch;
             }
 
+            // record execution order (only on change)
+            if (executionOrder.isEmpty() ||
+                executionOrder.get(executionOrder.size() - 1) != current) {
+                executionOrder.add(current);
+            }
+
+            // execute for 1 time unit
             timer++;
             current.remaining--;
-            prev_Process = current;
+            prevProcess = current;
 
+            // process finished
             if (current.remaining == 0) {
                 finish++;
                 current.turnaround = timer - current.arrival;
                 current.waiting = current.turnaround - current.burst;
-                executionOrder .add(current);
-                ReadyList.remove(current);
+                readyList.remove(current);
             }
         }
+    }
+
+
+
+    public double getAverageWaitingTime() {
+        int totalWaitingTime = 0;
+        for (Process p : executionOrder) {
+            totalWaitingTime += p.waiting;
+        }
+        return (double) totalWaitingTime / executionOrder.size();
+    }
+
+
+
+    public double getAverageTurnaroundTime() {
+        int totalTurnaroundTime = 0;
+        for (Process p : executionOrder) {
+            totalTurnaroundTime += p.turnaround;
+        }
+        return (double) totalTurnaroundTime / executionOrder.size();
     }
 }
