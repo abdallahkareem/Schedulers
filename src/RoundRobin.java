@@ -8,6 +8,22 @@ public class RoundRobin implements Scheduler {
         return executionOrder;
     }
 
+    public double getAverageWaitingTime() {
+        double totalWaitingTime = 0;
+        for (Process proc : executionOrder) {
+            totalWaitingTime += proc.waiting;
+        }
+        return totalWaitingTime / executionOrder.size();
+    }
+
+    public double getAverageTurnaroundTime() {
+        double totalTurnaroundTime = 0;
+        for (Process proc : executionOrder) {
+            totalTurnaroundTime += proc.turnaround;
+        }
+        return totalTurnaroundTime / executionOrder.size();
+    }
+    
     @Override
     public void run(List<Process> processes, int contextSwitch) {
         int NumProcess = processes.size();
@@ -53,7 +69,7 @@ public class RoundRobin implements Scheduler {
             executionOrder.add(current);
             prevProcess = current;
 
-            if (current.remaining == 0) { 
+            if (current.remaining == 0) {
                 finish++;
                 current.turnaround = timer - current.arrival;
                 current.waiting = current.turnaround - current.burst;

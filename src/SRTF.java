@@ -6,6 +6,23 @@ public class SRTF implements Scheduler {
 	public List<Process> getExecutionOrder() {
         return executionOrder;
     }
+
+    public double getAverageWaitingTime() {
+        double totalWaitingTime = 0;
+        for (Process proc : executionOrder) {
+            totalWaitingTime += proc.waiting;
+        }
+        return totalWaitingTime / executionOrder.size();
+    }
+    
+    public double getAverageTurnaroundTime() {
+        double totalTurnaroundTime = 0;
+        for (Process proc : executionOrder) {
+            totalTurnaroundTime += proc.turnaround;
+        }
+        return totalTurnaroundTime / executionOrder.size();
+    }
+    
     @Override
     public void run(List<Process> processes, int contextSwitch) {
 		

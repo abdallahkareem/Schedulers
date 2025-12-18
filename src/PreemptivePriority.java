@@ -9,6 +9,22 @@ public class PreemptivePriority implements Scheduler {
         return executionOrder;
     }
 
+    public double getAverageWaitingTime() {
+        double totalWaitingTime = 0;
+        for (Process proc : executionOrder) {
+            totalWaitingTime += proc.waiting;
+        }
+        return executionOrder.isEmpty() ? 0 : totalWaitingTime / executionOrder.size();
+    }
+
+    public double getAverageTurnaroundTime() {
+        double totalTurnaroundTime = 0;
+        for (Process proc : executionOrder) {
+            totalTurnaroundTime += proc.turnaround;
+        }
+        return executionOrder.isEmpty() ? 0 : totalTurnaroundTime / executionOrder.size();
+    }
+
     @Override
     public void run(List<Process> processes, int contextSwitch) {
 

@@ -2,6 +2,29 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Queue;
 public class AGScheduler implements Scheduler { // Hybrid Algorithm (FCFS, Priority_P, SRTF)
+	private List<Process> executionOrder = new LinkedList<>();
+	
+	public List<Process> getExecutionOrder(){
+		return executionOrder;
+	}
+
+	public double getAverageWaitingTime() {
+        double totalWaitingTime = 0;
+        for (Process proc : executionOrder) {
+            totalWaitingTime += proc.waiting;
+        }
+        return totalWaitingTime / executionOrder.size();
+    }
+
+    public double getAverageTurnaroundTime() {
+        double totalTurnaroundTime = 0;
+        for (Process proc : executionOrder) {
+            totalTurnaroundTime += proc.turnaround;
+        }
+        return totalTurnaroundTime / executionOrder.size();
+    }
+
+	
 	@Override
 	public void run(List<Process> processes,int contextSwitch) {
 		int completed = 0;
@@ -38,6 +61,7 @@ public class AGScheduler implements Scheduler { // Hybrid Algorithm (FCFS, Prior
 			}
 			if (current.remaining == 0) {
 				completed++;
+				executionOrder.add(current);
 				current.quantum = 0;
 				continue;
 			}
@@ -62,6 +86,7 @@ public class AGScheduler implements Scheduler { // Hybrid Algorithm (FCFS, Prior
 				time++;
 			}
 			if (current.remaining == 0) {
+				executionOrder.add(current);
 				completed++;
 				current.quantum = 0;
 				continue;
@@ -86,6 +111,7 @@ public class AGScheduler implements Scheduler { // Hybrid Algorithm (FCFS, Prior
 				remainingQuantum--;
 				if (current.remaining == 0) {
 					completed++;
+					executionOrder.add(current);
 					current.quantum = 0;
 					break;
 				}

@@ -4,7 +4,7 @@ public class Process {
 	public int arrival;
 	public int burst;
 	public int priority;
-	public int quantum;
+	public Integer quantum;
 	
 	public int remaining;
 	public int waiting;
