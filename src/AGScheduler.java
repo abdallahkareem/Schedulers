@@ -24,32 +24,32 @@ public class AGScheduler implements Scheduler {
 
         int time = 0;
         int completed = 0;
-
         while (completed < processes.size()) {
+        boolean preemted = false;
 
             // add arrivals
-            while (!notArrived.isEmpty() && notArrived.get(0).arrival <= time) {
+            while (!notArrived.isEmpty() && notArrived.get(0).arrival <= time)
                 ready.add(notArrived.remove(0));
-            }
 
+            // if no process is ready, advance time
             if (ready.isEmpty()) {
                 time++;
                 continue;
             }
 
-            Process current = ready.poll();
+            Process current = ready.remove();
             recordExecution(current);
 
             int q = current.quantum;
-            int used = 0;
+            int usedQuantumAmount = 0;
 
             /* ===== Phase 1: FCFS (25%) ===== */
             int phase1 = (int) Math.ceil(q * 0.25);
 
-            while (used < phase1 && current.remaining > 0) {
+            while (usedQuantumAmount < phase1 && current.remaining > 0) {
                 executeOneUnit(current);
                 time++;
-                used++;
+                usedQuantumAmount++;
                 addArrivals(notArrived, ready, time);
             }
 
@@ -60,45 +60,27 @@ public class AGScheduler implements Scheduler {
             }
 
             if (existsHigherPriority(current, ready)) {
-                updateQuantumFCFS(current, q, used);
+                updateQuantumPriority(current, q, usedQuantumAmount);
                 ready.add(current);
                 time += contextSwitch;
+                preemted = true;
                 continue;
             }
 
             /* ===== Phase 2: Priority (25%) ===== */
             int phase2 = (int) Math.ceil(q * 0.25);
 
-            while (used < phase1 + phase2 && current.remaining > 0) {
+            while (usedQuantumAmount < phase1 + phase2 && current.remaining > 0) {
                 executeOneUnit(current);
                 time++;
-                used++;
-                addArrivals(notArrived, ready, time);
-            }
-
-            if (finish(current, time)) {
-                completed++;
-                time += contextSwitch;
-                continue;
-            }
-
-            if (existsShorter(current, ready)) {
-                updateQuantumFull(current, q, used);
-                ready.add(current);
-                time += contextSwitch;
-                continue;
-            }
-
-            /* ===== Phase 3: SJF (50%) ===== */
-            while (used < q && current.remaining > 0) {
-                executeOneUnit(current);
-                time++;
-                used++;
+                usedQuantumAmount++;
                 addArrivals(notArrived, ready, time);
 
-                if (existsShorter(current, ready)) {
-                    updateQuantumFull(current, q, used);
+                if (existsHigherPriority(current, ready)) {
+                    updateQuantumPriority(current, q, usedQuantumAmount);
                     ready.add(current);
+                    time += contextSwitch;
+                    preemted = true;
                     break;
                 }
             }
@@ -109,15 +91,37 @@ public class AGScheduler implements Scheduler {
                 continue;
             }
 
+            if (existsShorter(current, ready)) {
+                updateQuantumFull(current, q, usedQuantumAmount);
+                ready.add(current);
+                time += contextSwitch;
+                preemted = true;
+                continue;
+            }
+
+            /* ===== Phase 3: SJF (50%) ===== */
+            while (usedQuantumAmount < q && current.remaining > 0) {
+                executeOneUnit(current);
+                time++;
+                usedQuantumAmount++;
+                addArrivals(notArrived, ready, time);
+            }
+
+            if (finish(current, time)) {
+                completed++;
+                time += contextSwitch;
+                continue;
+            }
+
             /* ===== Quantum exhausted ===== */
-            current.quantum += 2;
-            current.quantumHistory.add(current.quantum);
-            ready.add(current);
-            time += contextSwitch;
+            if (!preemted && current.remaining > 0) {
+                current.quantum += 2;
+                current.quantumHistory.add(current.quantum);
+                ready.add(current);
+                time += contextSwitch;
+            }
         }
     }
-
-    /* ================= Helpers ================= */
 
     private void executeOneUnit(Process p) {
         p.remaining--;
@@ -167,21 +171,13 @@ public class AGScheduler implements Scheduler {
         return false;
     }
 
-    private void updateQuantumFCFS(Process p, int q, int used) {
-        p.quantum = q + (int) Math.ceil((q - used) / 2.0);
+    private void updateQuantumPriority(Process p, int q, int usedQuantumAmount) {
+        p.quantum = q + (int) Math.ceil((q - usedQuantumAmount) / 2.0);
         p.quantumHistory.add(p.quantum);
     }
 
-    private void updateQuantumFull(Process p, int q, int used) {
-        p.quantum = q + (q - used);
+    private void updateQuantumFull(Process p, int q, int usedQuantumAmount) {
+        p.quantum = q + (q - usedQuantumAmount);
         p.quantumHistory.add(p.quantum);
-    }
-
-    public double getAverageWaitingTime() {
-        return finished.stream().mapToInt(p -> p.waiting).average().orElse(0);
-    }
-
-    public double getAverageTurnaroundTime() {
-        return finished.stream().mapToInt(p -> p.turnaround).average().orElse(0);
     }
 }
