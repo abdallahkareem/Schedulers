@@ -2,51 +2,33 @@ import java.util.*;
 
 public class AGScheduler implements Scheduler {
 
-    private List<Process> executionOrder = new LinkedList<>();
-    private List<ProcessResult> processResults = new ArrayList<>();
+    private List<Process> executionOrder = new ArrayList<>();
+    private List<Process> finished = new ArrayList<>();
 
     public List<Process> getExecutionOrder() {
         return executionOrder;
     }
 
-    public List<ProcessResult> getProcessResults() {
-        return processResults;
+    public List<Process> getFinishedProcesses() {
+        return finished;
     }
-
-    public double getAverageWaitingTime() {
-        double sum = 0;
-        for (ProcessResult r : processResults)
-            sum += r.waitingTime;
-        return processResults.isEmpty() ? 0 : sum / processResults.size();
-    }
-
-    public double getAverageTurnaroundTime() {
-        double sum = 0;
-        for (ProcessResult r : processResults)
-            sum += r.turnaroundTime;
-        return processResults.isEmpty() ? 0 : sum / processResults.size();
-    }
-
-    // ======================= CORE =======================
 
     @Override
     public void run(List<Process> processes, int contextSwitch) {
 
-        int time = 0;
-        int completed = 0;
-        int n = processes.size();
-
-        for (Process p : processes)
-            p.remaining = p.burst;
+        List<Process> notArrived = new ArrayList<>(processes);
+        notArrived.sort(Comparator.comparingInt(p -> p.arrival));
 
         Queue<Process> ready = new LinkedList<>();
-        while (completed < n) {
 
-            // add arrived processes
-            for (Process p : processes) {
-                if (p.arrival <= time && p.remaining > 0 && !ready.contains(p)) {
-                    ready.add(p);
-                }
+        int time = 0;
+        int completed = 0;
+
+        while (completed < processes.size()) {
+
+            // add arrivals
+            while (!notArrived.isEmpty() && notArrived.get(0).arrival <= time) {
+                ready.add(notArrived.remove(0));
             }
 
             if (ready.isEmpty()) {
@@ -58,121 +40,147 @@ public class AGScheduler implements Scheduler {
             recordExecution(current);
 
             int q = current.quantum;
+            int used = 0;
 
-            // ---------- 25% FCFS ----------
-            int q1 = ceil(q * 0.25);
-            time = execute(current, q1, time);
-            if (finishIfDone(current, time)) {
+            /* ===== Phase 1: FCFS (25%) ===== */
+            int phase1 = (int) Math.ceil(q * 0.25);
+
+            while (used < phase1 && current.remaining > 0) {
+                executeOneUnit(current);
+                time++;
+                used++;
+                addArrivals(notArrived, ready, time);
+            }
+
+            if (finish(current, time)) {
                 completed++;
+                time += contextSwitch;
                 continue;
             }
 
-            // ---------- 50% Priority ----------
-            Process best = highestPriority(current, ready);
-            if (best != current) {
-                increaseQuantum(current, q - q1);
+            if (existsHigherPriority(current, ready)) {
+                updateQuantumFCFS(current, q, used);
                 ready.add(current);
+                time += contextSwitch;
                 continue;
             }
 
-            int q2 = ceil(q * 0.5) - q1;
-            time = execute(current, q2, time);
-            if (finishIfDone(current, time)) {
+            /* ===== Phase 2: Priority (25%) ===== */
+            int phase2 = (int) Math.ceil(q * 0.25);
+
+            while (used < phase1 + phase2 && current.remaining > 0) {
+                executeOneUnit(current);
+                time++;
+                used++;
+                addArrivals(notArrived, ready, time);
+            }
+
+            if (finish(current, time)) {
                 completed++;
+                time += contextSwitch;
                 continue;
             }
 
-            // ---------- Remaining SJF ----------
-            int remainingQ = q - (q1 + q2);
-            while (remainingQ > 0) {
+            if (existsShorter(current, ready)) {
+                updateQuantumFull(current, q, used);
+                ready.add(current);
+                time += contextSwitch;
+                continue;
+            }
 
-                Process shortest = shortestJob(current, ready);
-                if (shortest != current) {
-                    increaseQuantum(current, remainingQ);
+            /* ===== Phase 3: SJF (50%) ===== */
+            while (used < q && current.remaining > 0) {
+                executeOneUnit(current);
+                time++;
+                used++;
+                addArrivals(notArrived, ready, time);
+
+                if (existsShorter(current, ready)) {
+                    updateQuantumFull(current, q, used);
                     ready.add(current);
                     break;
                 }
-
-                time = execute(current, 1, time);
-                remainingQ--;
-
-                if (finishIfDone(current, time)) {
-                    completed++;
-                    break;
-                }
             }
 
-            if (current.remaining > 0 && !ready.contains(current)) {
-                increaseQuantum(current, 2);
-                ready.add(current);
+            if (finish(current, time)) {
+                completed++;
+                time += contextSwitch;
+                continue;
             }
+
+            /* ===== Quantum exhausted ===== */
+            current.quantum += 2;
+            current.quantumHistory.add(current.quantum);
+            ready.add(current);
+            time += contextSwitch;
         }
     }
 
-    // ======================= HELPERS =======================
+    /* ================= Helpers ================= */
 
-    private int execute(Process p, int units, int time) {
-        for (int i = 0; i < units && p.remaining > 0; i++) {
-            p.remaining--;
-            time++;
-        }
-        recordExecution(p);
-        return time;
+    private void executeOneUnit(Process p) {
+        p.remaining--;
     }
 
-    private boolean finishIfDone(Process p, int time) {
-        if (p.remaining == 0) {
-            p.quantumHistory.add(0);
+    private void addArrivals(List<Process> notArrived, Queue<Process> ready, int time) {
+        while (!notArrived.isEmpty() && notArrived.get(0).arrival <= time) {
+            ready.add(notArrived.remove(0));
+        }
+    }
 
-            int turnaround = time - p.arrival;
-            int waiting = turnaround - p.burst;
+    private boolean finish(Process p, int time) {
+        if (p.remaining == 0 && p.completionTime == -1) {
+            p.completionTime = time;
+            p.turnaround = time - p.arrival;
+            p.waiting = p.turnaround - p.burst;
 
-            processResults.add(
-                new ProcessResult(
-                    p.name,
-                    waiting,
-                    turnaround,
-                    new ArrayList<>(p.quantumHistory)
-                )
-            );
+            // If last executed quantum is not 0, append 0
+            if (p.quantumHistory.isEmpty() || p.quantumHistory.get(p.quantumHistory.size()-1) != 0) {
+                p.quantumHistory.add(0);
+            }
 
-            p.quantum = 0;
+            finished.add(p);
             return true;
         }
         return false;
     }
 
-    private void increaseQuantum(Process p, int inc) {
-        p.quantum += ceil(inc / 2.0);
-        p.quantumHistory.add(p.quantum);
-    }
-
     private void recordExecution(Process p) {
-        if (executionOrder.isEmpty() ||
-            executionOrder.get(executionOrder.size() - 1) != p) {
+        if (executionOrder.isEmpty()
+                || executionOrder.get(executionOrder.size() - 1) != p) {
             executionOrder.add(p);
         }
     }
 
-    private Process highestPriority(Process current, Queue<Process> q) {
-        Process best = current;
-        for (Process p : q) {
-            if (p.priority < best.priority)
-                best = p;
-        }
-        return best;
+    private boolean existsHigherPriority(Process current, Queue<Process> ready) {
+        for (Process p : ready)
+            if (p.priority < current.priority)
+                return true;
+        return false;
     }
 
-    private Process shortestJob(Process current, Queue<Process> q) {
-        Process best = current;
-        for (Process p : q) {
-            if (p.remaining < best.remaining)
-                best = p;
-        }
-        return best;
+    private boolean existsShorter(Process current, Queue<Process> ready) {
+        for (Process p : ready)
+            if (p.remaining < current.remaining)
+                return true;
+        return false;
     }
 
-    private int ceil(double x) {
-        return (int) Math.ceil(x);
+    private void updateQuantumFCFS(Process p, int q, int used) {
+        p.quantum = q + (int) Math.ceil((q - used) / 2.0);
+        p.quantumHistory.add(p.quantum);
+    }
+
+    private void updateQuantumFull(Process p, int q, int used) {
+        p.quantum = q + (q - used);
+        p.quantumHistory.add(p.quantum);
+    }
+
+    public double getAverageWaitingTime() {
+        return finished.stream().mapToInt(p -> p.waiting).average().orElse(0);
+    }
+
+    public double getAverageTurnaroundTime() {
+        return finished.stream().mapToInt(p -> p.turnaround).average().orElse(0);
     }
 }

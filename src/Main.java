@@ -1,36 +1,22 @@
-public class Main {
+import java.util.*;
 
+public class Main {
     public static void main(String[] args) {
 
-        String jsonFilePath = "D:/Schedulers/test_cases_v3/Other_Schedulers/test_1.json";
+        List<Process> processes = new ArrayList<>();
 
-        SchedulersTester tester = new SchedulersTester(jsonFilePath);
-        try {
-            tester.runTests();
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
+        processes.add(new Process("P1", 0, 10, 3, 4));
+        processes.add(new Process("P2", 0, 8, 1, 5));
+        processes.add(new Process("P3", 0, 12, 2, 6));
+        processes.add(new Process("P4", 0, 6, 4, 3));
+        processes.add(new Process("P5", 0, 9, 5, 4));
+
+        AGScheduler scheduler = new AGScheduler();
+        scheduler.run(processes, 0);
+
+        SchedulerPrinter.print(
+                scheduler.getExecutionOrder(),
+                scheduler.getFinishedProcesses()
+        );
     }
 }
-
-        // List<Process> processes = new ArrayList<>();
-
-        // Process process1 = new Process("p1", 2, 6, 3, 0);
-        // Process process2 = new Process("p2", 5, 2, 1, 0);
-        // Process process3 = new Process("p3", 1, 8, 4, 0);
-        // Process process4 = new Process("p4", 0, 3, 5, 0);
-        // Process process5 = new Process("p5", 4, 4, 2, 0);
-
-        // processes.add(process1);
-        // processes.add(process2);
-        // processes.add(process3);
-        // processes.add(process4);
-        // processes.add(process5);
-
-        // PreemptivePriority scheduler = new PreemptivePriority();
-        // scheduler.run(processes, 0);
-
-        // SchedulerPrinter.print(
-        //         scheduler.getExecutionOrder(),
-        //         processes
-        // );

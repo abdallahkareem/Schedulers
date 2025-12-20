@@ -7,7 +7,7 @@ public class SchedulerPrinter {
         // executionOrder
         System.out.print("\"executionOrder\": [");
         int totaltime = 0 ;
-        int totalturnAround = 0;
+        int totalturnAround = 0;;
         for (Process p : processes) {
              totaltime += p.waiting;
              totalturnAround += p.turnaround;
@@ -26,6 +26,11 @@ public class SchedulerPrinter {
             System.out.print("  {\"name\": \"" + p.name + "\", ");
             System.out.print("\"waitingTime\": " + p.waiting + ", ");
             System.out.print("\"turnaroundTime\": " + p.turnaround + "}");
+            System.out.print(", \"quantumHistory\": [" + p.quantumHistory.get(0));
+            for (int j = 1; j < p.quantumHistory.size(); j++) {
+                System.out.print(", " + p.quantumHistory.get(j));
+            }
+            System.out.print("]");
 
             if (i < processes.size() - 1) System.out.print(",");
             System.out.println();
