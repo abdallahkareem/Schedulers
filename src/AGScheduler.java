@@ -25,13 +25,10 @@ public class AGScheduler implements Scheduler {
         int time = 0;
         int completed = 0;
         while (completed < processes.size()) {
-        boolean preemted = false;
 
-            // add arrivals
             while (!notArrived.isEmpty() && notArrived.get(0).arrival <= time)
                 ready.add(notArrived.remove(0));
 
-            // if no process is ready, advance time
             if (ready.isEmpty()) {
                 time++;
                 continue;
@@ -55,19 +52,16 @@ public class AGScheduler implements Scheduler {
 
             if (finish(current, time)) {
                 completed++;
-                time += contextSwitch;
                 continue;
             }
 
             if (existsHigherPriority(current, ready)) {
                 updateQuantumPriority(current, q, usedQuantumAmount);
                 ready.add(current);
-                time += contextSwitch;
-                preemted = true;
                 continue;
             }
 
-            /* ===== Phase 2: Priority (25%) ===== */
+            /* ===== Phase 2: preemtive Priority (25%) ===== */
             int phase2 = (int) Math.ceil(q * 0.25);
 
             while (usedQuantumAmount < phase1 + phase2 && current.remaining > 0) {
@@ -79,23 +73,18 @@ public class AGScheduler implements Scheduler {
                 if (existsHigherPriority(current, ready)) {
                     updateQuantumPriority(current, q, usedQuantumAmount);
                     ready.add(current);
-                    time += contextSwitch;
-                    preemted = true;
                     break;
                 }
             }
 
             if (finish(current, time)) {
                 completed++;
-                time += contextSwitch;
                 continue;
             }
 
             if (existsShorter(current, ready)) {
-                updateQuantumFull(current, q, usedQuantumAmount);
+                updateQuantumSJF(current, q, usedQuantumAmount);
                 ready.add(current);
-                time += contextSwitch;
-                preemted = true;
                 continue;
             }
 
@@ -109,17 +98,13 @@ public class AGScheduler implements Scheduler {
 
             if (finish(current, time)) {
                 completed++;
-                time += contextSwitch;
                 continue;
             }
 
             /* ===== Quantum exhausted ===== */
-            if (!preemted && current.remaining > 0) {
-                current.quantum += 2;
-                current.quantumHistory.add(current.quantum);
-                ready.add(current);
-                time += contextSwitch;
-            }
+            current.quantum += 2;
+            current.quantumHistory.add(current.quantum);
+            ready.add(current);
         }
     }
 
@@ -139,7 +124,6 @@ public class AGScheduler implements Scheduler {
             p.turnaround = time - p.arrival;
             p.waiting = p.turnaround - p.burst;
 
-            // If last executed quantum is not 0, append 0
             if (p.quantumHistory.isEmpty() || p.quantumHistory.get(p.quantumHistory.size()-1) != 0) {
                 p.quantumHistory.add(0);
             }
@@ -158,16 +142,24 @@ public class AGScheduler implements Scheduler {
     }
 
     private boolean existsHigherPriority(Process current, Queue<Process> ready) {
+        Process highest = current;
         for (Process p : ready)
             if (p.priority < current.priority)
-                return true;
+                current = p;
+        if (highest != current) {
+            return true;
+        }
         return false;
     }
 
     private boolean existsShorter(Process current, Queue<Process> ready) {
+        Process shortest = current;
         for (Process p : ready)
             if (p.remaining < current.remaining)
-                return true;
+                current = p;
+        if (shortest != current) {
+            return true;
+        }
         return false;
     }
 
@@ -176,7 +168,7 @@ public class AGScheduler implements Scheduler {
         p.quantumHistory.add(p.quantum);
     }
 
-    private void updateQuantumFull(Process p, int q, int usedQuantumAmount) {
+    private void updateQuantumSJF(Process p, int q, int usedQuantumAmount) {
         p.quantum = q + (q - usedQuantumAmount);
         p.quantumHistory.add(p.quantum);
     }
