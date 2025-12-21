@@ -1,4 +1,3 @@
-
 import java.util.ArrayList;
 import java.util.LinkedList;
 import java.util.List;
@@ -71,6 +70,14 @@ public class RoundRobin implements Scheduler {
                 current.waiting = current.turnaround - current.burst;
                 processResults.add(new ProcessResult(current.name, current.waiting, current.turnaround, new ArrayList<>()));
             } else {
+                for (Process proc : processes) {
+                    if (proc != current &&
+                        proc.remaining > 0 &&
+                        proc.arrival <= timer &&
+                        !readyList.contains(proc)) {
+                        readyList.add(proc);
+                    }
+                }
                 readyList.add(current);
             }
         }
@@ -91,4 +98,4 @@ public class RoundRobin implements Scheduler {
         }
         return totalTurnaroundTime / processResults.size();
     }
-}
+    }
