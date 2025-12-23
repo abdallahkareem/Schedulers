@@ -16,88 +16,110 @@ public class PreemptivePriority implements Scheduler {
         int timer = 0;
         int finishCount = 0;
 
-        // Reset process states and initialize 'last' to arrival time
+        // Initialize 'last' time for all processes to their arrival time
         for (Process p : processes) {
             p.remaining = p.burst;
             lastUpdateTime.put(p, p.arrival);
         }
 
-        Process currentlyOnCPU = null;
+        // 'lastCpuOwner' tracks the last process to execute, even if it finished.
+        // This is used to detect if a context switch is needed (loading new process).
+        Process lastCpuOwner = null;
+
+        // 'currentlyRunning' tracks the process actively consuming the CPU *in this tick*.
+        Process currentlyRunning = null;
 
         while (finishCount < numProcess) {
-            // 1. Check aging before selection
+
+            // 1. Apply Aging (including to the running process)
             applyAging(processes, timer);
 
-            // 2. Choose the best process
+            // 2. Select the best process
             Process best = selectBestProcess(processes, timer);
 
-            if (best == null) {
-                timer++;
+            // 3. Handle Context Switching
+            // A switch is needed if the chosen 'best' is different from the last one who held the CPU.
+            // Exception: No switch penalty at T=0 (lastCpuOwner is null).
+            if (best != null && lastCpuOwner != null && best != lastCpuOwner) {
+
+                // If the previous owner is still alive (preempted), update its 'last' time
+                // We update this BEFORE the switch time passes.
+                if (currentlyRunning != null && currentlyRunning.remaining > 0) {
+                    lastUpdateTime.put(currentlyRunning, timer);
+                }
+
+                // Perform Context Switch (Pass time)
+                // During these ticks, the CPU is technically "switching", so no process executes.
+                // However, aging MUST continue.
+                for (int i = 0; i < contextSwitch; i++) {
+                    timer++;
+                    applyAging(processes, timer);
+                }
+
+                // After switch duration, set the new owner.
+                // We do NOT execute yet. We loop back to re-evaluate.
+                // Why? Because during the switch, someone else might have arrived or aged.
+                lastCpuOwner = best;
+                currentlyRunning = null; // No one ran this tick, we just switched.
                 continue;
             }
 
-            // 3. Check for Context Switch (if process changes)
-            if (best != currentlyOnCPU) {
-                // If a process was actually running and is being switched out
-                if (currentlyOnCPU != null && currentlyOnCPU.remaining > 0) {
-                    lastUpdateTime.put(currentlyOnCPU, timer);
-                }
-
-                // Increase time by context switch
-                timer += contextSwitch;
-
-                // Re-check aging and re-select (recursive check)
-                while (true) {
-                    applyAging(processes, timer);
-                    Process newBest = selectBestProcess(processes, timer);
-                    if (newBest == best) break;
-                    best = newBest;
-                }
-
-                // Dispatch selected process
-                currentlyOnCPU = best;
+            // 4. Case: CPU Idle (No best process found)
+            if (best == null) {
+                timer++;
+                currentlyRunning = null;
+                continue;
             }
 
-            // 4. Record execution order
-            if (executionOrder.isEmpty() || executionOrder.get(executionOrder.size() - 1) != currentlyOnCPU) {
-                executionOrder.add(currentlyOnCPU);
+            // 5. Case: Ready to Execute (best == lastCpuOwner OR first process)
+            // If this is the very first process (lastCpuOwner == null), set it now.
+            if (lastCpuOwner == null) {
+                lastCpuOwner = best;
             }
 
-            // 5. Execute for 1 time unit
+            currentlyRunning = best;
+
+            // Record execution order
+            if (executionOrder.isEmpty() || executionOrder.get(executionOrder.size() - 1) != currentlyRunning) {
+                executionOrder.add(currentlyRunning);
+            }
+
+            // Execute Tick
             timer++;
-            currentlyOnCPU.remaining--;
+            currentlyRunning.remaining--;
 
-            // 6. Check for completion
-            if (currentlyOnCPU.remaining == 0) {
+            // 6. Check Completion
+            if (currentlyRunning.remaining == 0) {
                 finishCount++;
-                currentlyOnCPU.turnaround = timer - currentlyOnCPU.arrival;
-                currentlyOnCPU.waiting = currentlyOnCPU.turnaround - currentlyOnCPU.burst;
+                currentlyRunning.turnaround = timer - currentlyRunning.arrival;
+                currentlyRunning.waiting = currentlyRunning.turnaround - currentlyRunning.burst;
 
                 processResults.add(new ProcessResult(
-                        currentlyOnCPU.name,
-                        currentlyOnCPU.waiting,
-                        currentlyOnCPU.turnaround,
+                        currentlyRunning.name,
+                        currentlyRunning.waiting,
+                        currentlyRunning.turnaround,
                         new ArrayList<>()
                 ));
 
-                // CPU becomes free; next selection will trigger a CS if needed
-                currentlyOnCPU = null;
+                // Process finished. It is no longer "running", but it remains 'lastCpuOwner'
+                // so that if a NEW process starts next, we trigger a context switch.
+                currentlyRunning = null;
             }
         }
 
-        // Ensure results are sorted by name or arrival if required by your printer
         processResults.sort(Comparator.comparing(r -> r.name));
     }
 
     private void applyAging(List<Process> processes, int currentTime) {
         for (Process p : processes) {
+            // Apply aging to ALL arrived, incomplete processes (Ready AND Running)
             if (p.remaining > 0 && p.arrival <= currentTime) {
                 int last = lastUpdateTime.get(p);
-                // Hint: If ((Time - last) % agingInterval == 0)
+
+                // Formula: If ((Time - last) % agingInterval == 0)
                 if (currentTime > last && (currentTime - last) % agingInterval == 0) {
                     if (p.priority > 1) {
                         p.priority--;
-                        // Hint: Update last value when aging is applied
                         lastUpdateTime.put(p, currentTime);
                     }
                 }
@@ -112,11 +134,11 @@ public class PreemptivePriority implements Scheduler {
                 if (best == null) {
                     best = p;
                 } else {
-                    // Primary: Priority (Lower is better)
+                    // 1. Priority (Lower is better)
                     if (p.priority < best.priority) {
                         best = p;
                     }
-                    // Tie-breaker: Arrival order (Lower is better)
+                    // 2. Tie-breaker: Arrival Time (Lower is better)
                     else if (p.priority == best.priority) {
                         if (p.arrival < best.arrival) {
                             best = p;
