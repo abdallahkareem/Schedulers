@@ -1,142 +1,133 @@
-import java.util.ArrayList;
-import java.util.LinkedList;
-import java.util.List;
-import java.util.HashMap;
-import java.util.Map;
+import java.util.*;
 
 public class PreemptivePriority implements Scheduler {
-
-    protected List<ProcessResult> processResults = new ArrayList<>();
+    private List<ProcessResult> processResults = new ArrayList<>();
     private List<Process> executionOrder = new LinkedList<>();
+    private Map<Process, Integer> lastUpdateTime = new HashMap<>();
     private int agingInterval;
 
     public PreemptivePriority(int agingInterval) {
         this.agingInterval = agingInterval;
     }
 
-    public List<Process> getExecutionOrder() {
-        return executionOrder;
-    }
-
-    public List<ProcessResult> getProcessResults() {
-        return processResults;
-    }
-
     @Override
     public void run(List<Process> processes, int contextSwitch) {
+        int numProcess = processes.size();
         int timer = 0;
-        int finished = 0;
-        int n = processes.size();
+        int finishCount = 0;
 
-        Map<Process, Integer> lastAgingTimeTracker = new HashMap<>();
+        // Reset process states and initialize 'last' to arrival time
         for (Process p : processes) {
             p.remaining = p.burst;
-            p.waiting = 0;
-            p.turnaround = 0;
-            lastAgingTimeTracker.put(p, p.arrival);
+            lastUpdateTime.put(p, p.arrival);
         }
 
-        List<Process> readyList = new LinkedList<>();
-        Process runningProcess = null;
+        Process currentlyOnCPU = null;
 
-        while (finished < n) {
-            updateReadyList(processes, readyList, timer);
+        while (finishCount < numProcess) {
+            // 1. Check aging before selection
+            applyAging(processes, timer);
 
-            if (readyList.isEmpty()) {
+            // 2. Choose the best process
+            Process best = selectBestProcess(processes, timer);
+
+            if (best == null) {
                 timer++;
                 continue;
             }
 
-            applyAging(readyList, runningProcess, timer, lastAgingTimeTracker);
-            Process highest = findHighestPriority(readyList);
-
-            // --- CONTEXT SWITCH LOGIC ---
-            // If the process we want to run is NOT the one currently on the CPU
-            if (runningProcess != highest) {
-                // Apply context switch if we were already running something
-                // OR if this is the very first process and it didn't arrive at t=0
-                if (runningProcess != null || timer > 0) {
-                    for (int i = 0; i < contextSwitch; i++) {
-                        timer++;
-                        updateReadyList(processes, readyList, timer);
-                    }
-                    // Re-find highest in case someone better arrived during the switch
-                    highest = findHighestPriority(readyList);
+            // 3. Check for Context Switch (if process changes)
+            if (best != currentlyOnCPU) {
+                // If a process was actually running and is being switched out
+                if (currentlyOnCPU != null && currentlyOnCPU.remaining > 0) {
+                    lastUpdateTime.put(currentlyOnCPU, timer);
                 }
 
-                runningProcess = highest;
-                if (executionOrder.isEmpty() || executionOrder.get(executionOrder.size() - 1) != runningProcess) {
-                    executionOrder.add(runningProcess);
+                // Increase time by context switch
+                timer += contextSwitch;
+
+                // Re-check aging and re-select (recursive check)
+                while (true) {
+                    applyAging(processes, timer);
+                    Process newBest = selectBestProcess(processes, timer);
+                    if (newBest == best) break;
+                    best = newBest;
                 }
+
+                // Dispatch selected process
+                currentlyOnCPU = best;
             }
 
-            // Execute for 1 time unit
-            runningProcess.remaining--;
-            timer++;
+            // 4. Record execution order
+            if (executionOrder.isEmpty() || executionOrder.get(executionOrder.size() - 1) != currentlyOnCPU) {
+                executionOrder.add(currentlyOnCPU);
+            }
 
-            if (runningProcess.remaining == 0) {
-                finished++;
-                runningProcess.turnaround = timer - runningProcess.arrival;
-                runningProcess.waiting = runningProcess.turnaround - runningProcess.burst;
+            // 5. Execute for 1 time unit
+            timer++;
+            currentlyOnCPU.remaining--;
+
+            // 6. Check for completion
+            if (currentlyOnCPU.remaining == 0) {
+                finishCount++;
+                currentlyOnCPU.turnaround = timer - currentlyOnCPU.arrival;
+                currentlyOnCPU.waiting = currentlyOnCPU.turnaround - currentlyOnCPU.burst;
 
                 processResults.add(new ProcessResult(
-                        runningProcess.name,
-                        runningProcess.waiting,
-                        runningProcess.turnaround,
+                        currentlyOnCPU.name,
+                        currentlyOnCPU.waiting,
+                        currentlyOnCPU.turnaround,
                         new ArrayList<>()
                 ));
 
-                readyList.remove(runningProcess);
-                // Reset runningProcess to null so the NEXT loop triggers a context switch
-                runningProcess = null;
+                // CPU becomes free; next selection will trigger a CS if needed
+                currentlyOnCPU = null;
             }
         }
+
+        // Ensure results are sorted by name or arrival if required by your printer
+        processResults.sort(Comparator.comparing(r -> r.name));
     }
 
-    private void updateReadyList(List<Process> allProcesses, List<Process> readyList, int currentTime) {
-        for (Process p : allProcesses) {
-            if (p.arrival <= currentTime && p.remaining > 0 && !readyList.contains(p)) {
-                readyList.add(p);
-            }
-        }
-    }
-
-    private void applyAging(List<Process> readyList, Process running, int currentTime, Map<Process, Integer> tracker) {
-        for (Process p : readyList) {
-            if (p != running) {
-                int lastAged = tracker.get(p);
-                // If interval reached, improve priority (lower the number)
-                if (currentTime - lastAged >= agingInterval && agingInterval > 0) {
-                    p.priority = Math.max(0, p.priority - 1);
-                    tracker.put(p, currentTime);
+    private void applyAging(List<Process> processes, int currentTime) {
+        for (Process p : processes) {
+            if (p.remaining > 0 && p.arrival <= currentTime) {
+                int last = lastUpdateTime.get(p);
+                // Hint: If ((Time - last) % agingInterval == 0)
+                if (currentTime > last && (currentTime - last) % agingInterval == 0) {
+                    if (p.priority > 1) {
+                        p.priority--;
+                        // Hint: Update last value when aging is applied
+                        lastUpdateTime.put(p, currentTime);
+                    }
                 }
             }
         }
     }
 
-    private Process findHighestPriority(List<Process> readyList) {
-        Process highest = readyList.get(0);
-        for (Process p : readyList) {
-            // Priority tie-break: earlier arrival time
-            if (p.priority < highest.priority ||
-                    (p.priority == highest.priority && p.arrival < highest.arrival)) {
-                highest = p;
+    private Process selectBestProcess(List<Process> processes, int currentTime) {
+        Process best = null;
+        for (Process p : processes) {
+            if (p.remaining > 0 && p.arrival <= currentTime) {
+                if (best == null) {
+                    best = p;
+                } else {
+                    // Primary: Priority (Lower is better)
+                    if (p.priority < best.priority) {
+                        best = p;
+                    }
+                    // Tie-breaker: Arrival order (Lower is better)
+                    else if (p.priority == best.priority) {
+                        if (p.arrival < best.arrival) {
+                            best = p;
+                        }
+                    }
+                }
             }
         }
-        return highest;
+        return best;
     }
 
-    public double getAverageWaitingTime() {
-        if (processResults.isEmpty()) return 0;
-        double total = 0;
-        for (ProcessResult p : processResults) total += p.waitingTime;
-        return total / processResults.size();
-    }
-
-    public double getAverageTurnaroundTime() {
-        if (processResults.isEmpty()) return 0;
-        double total = 0;
-        for (ProcessResult p : processResults) total += p.turnaroundTime;
-        return total / processResults.size();
-    }
+    public List<Process> getExecutionOrder() { return executionOrder; }
+    public List<ProcessResult> getProcessResults() { return processResults; }
 }
